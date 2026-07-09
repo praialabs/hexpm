@@ -132,8 +132,7 @@ defmodule HexpmWeb.PackageLive.FilterSidebar do
 
   defp filter_form(assigns) do
     ~H"""
-    <%!-- phx-auto-recover stops reconnects from re-firing filter_change and resetting the page --%>
-    <form phx-change="filter_change" id={@id} phx-auto-recover="ignore">
+    <form id={@id} phx-change="filter_change">
       <div class="mb-[18px]">
         <label
           class="flex items-center justify-between gap-2 text-small font-semibold text-grey-600 dark:text-grey-200 mb-1.5"
