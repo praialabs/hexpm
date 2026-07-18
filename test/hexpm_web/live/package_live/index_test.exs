@@ -234,5 +234,39 @@ defmodule HexpmWeb.PackageLive.IndexTest do
 
       refute_patched(view)
     end
+
+    test "ignores subsequent filter recovery events to prevent mobile/desktop race condition from clearing active filters",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/packages?search=build_tool%3Amix")
+
+      # First recovery event (e.g. desktop) recovers build_tool: mix
+      render_change(view, "filter_recover", %{
+        "build_tool" => "mix",
+        "depends" => "",
+        "updated_after" => ""
+      })
+
+      # Second recovery event (e.g. mobile) recovers empty values
+      render_change(view, "filter_recover", %{
+        "build_tool" => "",
+        "depends" => "",
+        "updated_after" => ""
+      })
+
+      refute_patched(view)
+    end
+
+    test "ignores subsequent sort recovery events to prevent mobile/desktop race condition from overriding active sort",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/packages?page=2&sort=recent_downloads")
+
+      # First recovery event (e.g. desktop) recovers recent_downloads
+      render_change(view, "sort_recover", %{"sort" => "recent_downloads"})
+
+      # Second recovery event (e.g. mobile) recovers default/other value
+      render_change(view, "sort_recover", %{"sort" => "name"})
+
+      refute_patched(view)
+    end
   end
 end

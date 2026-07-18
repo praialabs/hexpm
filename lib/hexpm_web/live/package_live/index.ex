@@ -29,7 +29,9 @@ defmodule HexpmWeb.PackageLive.Index do
         live_search: true,
         per_page: @packages_per_page,
         repositories: repositories,
-        sort_options: @sort_options
+        sort_options: @sort_options,
+        recovered_filters: false,
+        recovered_sort: false
       )
 
     {:ok, socket}
@@ -118,7 +120,7 @@ defmodule HexpmWeb.PackageLive.Index do
             </span>
           </button>
           <div class="flex-1"></div>
-          <form id="sort-form-mobile" phx-change="sort_change" class="inline-flex">
+          <form id="sort-form-mobile" phx-change="sort_change" phx-auto-recover="sort_recover" class="inline-flex">
             <label for="sort-select-mobile" class="sr-only">Sort</label>
             <div class="relative">
               <select
@@ -237,7 +239,7 @@ defmodule HexpmWeb.PackageLive.Index do
                   >
                     Sort by
                   </label>
-                  <form id="sort-form-desktop" phx-change="sort_change">
+                  <form id="sort-form-desktop" phx-change="sort_change" phx-auto-recover="sort_recover">
                     <div class="relative min-w-[200px]">
                       <select
                         id="sort-select"
@@ -313,27 +315,16 @@ defmodule HexpmWeb.PackageLive.Index do
 
   @impl true
   def handle_event("filter_change", params, socket) do
-    build_tool = nil_if_empty(params["build_tool"])
-    depends = nil_if_empty(params["depends"])
+    {:noreply, apply_filter_change(params, socket)}
+  end
 
-    updated_after =
-      case params["updated_after"] do
-        nil -> nil
-        "" -> nil
-        date_string -> "#{date_string}T00:00:00Z"
-      end
-
-    new_query = %{
-      socket.assigns.search_query
-      | build_tool: build_tool,
-        depends: depends,
-        updated_after: updated_after
-    }
-
-    if new_query == socket.assigns.search_query do
+  @impl true
+  def handle_event("filter_recover", params, socket) do
+    if socket.assigns.recovered_filters do
       {:noreply, socket}
     else
-      {:noreply, push_query(socket, new_query)}
+      socket = assign(socket, recovered_filters: true)
+      {:noreply, apply_filter_change(params, socket)}
     end
   end
 
@@ -357,14 +348,16 @@ defmodule HexpmWeb.PackageLive.Index do
 
   @impl true
   def handle_event("sort_change", %{"sort" => sort_param}, socket) do
-    if sort(sort_param) == socket.assigns.sort do
+    {:noreply, apply_sort_change(sort_param, socket)}
+  end
+
+  @impl true
+  def handle_event("sort_recover", %{"sort" => sort_param}, socket) do
+    if socket.assigns.recovered_sort do
       {:noreply, socket}
     else
-      url_params =
-        %{sort: sort_param, search: socket.assigns.search}
-        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-
-      {:noreply, push_patch(socket, to: ~p"/packages?#{url_params}")}
+      socket = assign(socket, recovered_sort: true)
+      {:noreply, apply_sort_change(sort_param, socket)}
     end
   end
 
@@ -393,6 +386,43 @@ defmodule HexpmWeb.PackageLive.Index do
   @impl true
   def handle_event("clear_filters", _params, socket) do
     {:noreply, push_patch(socket, to: ~p"/packages?#{[sort: socket.assigns.sort]}")}
+  end
+
+  defp apply_filter_change(params, socket) do
+    build_tool = nil_if_empty(params["build_tool"])
+    depends = nil_if_empty(params["depends"])
+
+    updated_after =
+      case params["updated_after"] do
+        nil -> nil
+        "" -> nil
+        date_string -> "#{date_string}T00:00:00Z"
+      end
+
+    new_query = %{
+      socket.assigns.search_query
+      | build_tool: build_tool,
+        depends: depends,
+        updated_after: updated_after
+    }
+
+    if new_query == socket.assigns.search_query do
+      socket
+    else
+      push_query(socket, new_query)
+    end
+  end
+
+  defp apply_sort_change(sort_param, socket) do
+    if sort(sort_param) == socket.assigns.sort do
+      socket
+    else
+      url_params =
+        %{sort: sort_param, search: socket.assigns.search}
+        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+      push_patch(socket, to: ~p"/packages?#{url_params}")
+    end
   end
 
   defp push_query(socket, %SearchQuery{} = query) do

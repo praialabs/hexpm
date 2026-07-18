@@ -132,7 +132,7 @@ defmodule HexpmWeb.PackageLive.FilterSidebar do
 
   defp filter_form(assigns) do
     ~H"""
-    <form id={@id} phx-change="filter_change">
+    <form id={@id} phx-change="filter_change" phx-auto-recover="filter_recover">
       <div class="mb-[18px]">
         <label
           class="flex items-center justify-between gap-2 text-small font-semibold text-grey-600 dark:text-grey-200 mb-1.5"
